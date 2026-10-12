@@ -83,6 +83,10 @@ function App() {
       </p>
       <DndContext
         sensors={sensors}
+        // dnd-kit's own auto-scroll is on by default and fights with the one
+        // useVirtualRowReorder implements (which is virtualization-aware) —
+        // without this it keeps scrolling past where the pointer says it should.
+        autoScroll={false}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DragCancelEvent,
   DragEndEvent,
@@ -48,40 +48,54 @@ export interface UseVirtualRowReorderResult {
  * rows that aren't currently mounted in the DOM.
  *
  * Give each row's drag handle `useDraggable({ id: virtualRow.index })` — the row's CURRENT
- * index, not a stable row id. This hook derives the drop target from pointer delta ÷
- * row height instead of DOM collision, so it works even when the target row is off-screen,
+ * index, not a stable row id. This hook derives the drop target from raw pointer position
+ * ÷ row height instead of DOM collision, so it works even when the target row is off-screen,
  * and drives auto-scroll while the pointer sits near the edge of the scroll container.
+ *
+ * Pointer position is tracked with a native, capture-phase `pointermove` listener rather
+ * than dnd-kit's own `event.delta`, for two reasons found the hard way:
+ *
+ * 1. dnd-kit compensates `delta` for scroll on the dragged item's ancestors. Since this hook
+ *    scrolls the container itself, that compensation fights back — each auto-scroll tick
+ *    inflates `delta`, which the hook reads as "the pointer moved further", triggering more
+ *    auto-scroll, in a runaway loop that only stops once the container scrolls back to 0.
+ * 2. Once a drag is active, dnd-kit stops propagation of pointer events at the bubble phase,
+ *    so a plain `window.addEventListener("pointermove", ...)` stops firing almost
+ *    immediately. Listening in the capture phase runs before that happens.
+ *
+ * Every piece of `options` is read through a ref rather than closed over directly, so
+ * `runAutoScroll`/`handlePointerMove` keep a stable identity for the component's lifetime —
+ * including when a caller (reasonably) passes an inline `getScrollElement` that gets a new
+ * identity on every render. Without that, the pointermove listener attached in `onDragStart`
+ * would get silently detached by effect cleanup on the very next render triggered by
+ * `setActiveIndex`, and auto-scroll would die after a single tick.
  */
 export function useVirtualRowReorder(
   options: UseVirtualRowReorderOptions,
 ): UseVirtualRowReorderResult {
-  const {
-    count,
-    rowHeight,
-    getScrollElement,
-    onReorder,
-    activationDistance = 4,
-    edgeScrollZone = 60,
-    edgeScrollSpeed = 14,
-  } = options;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
-  const accumulatedDeltaY = useRef(0);
-  const lastClientY = useRef<number | null>(null);
+  // Raw (uncompensated) pointer Y and the scrollTop/pointerY the drag started at — together
+  // these give the total content-space displacement: how much the container has scrolled,
+  // plus how much the pointer itself has moved, since the drag began.
+  const startClientY = useRef(0);
+  const startScrollTop = useRef(0);
+  const rawClientY = useRef<number | null>(null);
   const autoScrollFrame = useRef<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: activationDistance },
+      activationConstraint: { distance: options.activationDistance ?? 4 },
     }),
   );
 
-  const clampIndex = useCallback(
-    (index: number) => Math.min(Math.max(index, 0), count - 1),
-    [count],
-  );
+  const clampIndex = useCallback((index: number) => {
+    return Math.min(Math.max(index, 0), optionsRef.current.count - 1);
+  }, []);
 
   const stopAutoScroll = useCallback(() => {
     if (autoScrollFrame.current !== null) {
@@ -90,18 +104,25 @@ export function useVirtualRowReorder(
     }
   }, []);
 
-  // Held in a ref so the rAF loop below always reads the latest activeIndex/clampIndex
-  // without needing to be restarted every time they change.
+  // Held in a ref so rAF/event callbacks below always read the latest activeIndex/clampIndex
+  // without needing to be re-subscribed every time they change.
   const recomputeOverIndexRef = useRef<() => void>(() => {});
   recomputeOverIndexRef.current = () => {
-    if (activeIndex === null) return;
-    const rawOffset = accumulatedDeltaY.current / rowHeight;
+    if (activeIndex === null || rawClientY.current === null) return;
+    const { getScrollElement, rowHeight } = optionsRef.current;
+    const container = getScrollElement();
+    const scrollDelta = (container?.scrollTop ?? startScrollTop.current) - startScrollTop.current;
+    const pointerDelta = rawClientY.current - startClientY.current;
+    const rawOffset = (scrollDelta + pointerDelta) / rowHeight;
     setOverIndex(clampIndex(activeIndex + Math.round(rawOffset)));
   };
 
+  // Stable for the component's lifetime: reads everything through optionsRef instead of
+  // closing over `options` fields directly, so it's immune to the caller's own render churn.
   const runAutoScroll = useCallback(() => {
+    const { getScrollElement, edgeScrollZone = 60, edgeScrollSpeed = 14 } = optionsRef.current;
     const container = getScrollElement();
-    const clientY = lastClientY.current;
+    const clientY = rawClientY.current;
     if (!container || clientY === null) {
       autoScrollFrame.current = null;
       return;
@@ -121,53 +142,63 @@ export function useVirtualRowReorder(
 
     if (delta !== 0) {
       container.scrollTop += delta;
-      accumulatedDeltaY.current += delta;
       recomputeOverIndexRef.current();
       autoScrollFrame.current = requestAnimationFrame(runAutoScroll);
     } else {
       autoScrollFrame.current = null;
     }
-  }, [getScrollElement, edgeScrollZone, edgeScrollSpeed]);
-
-  const onDragStart = useCallback((event: DragStartEvent) => {
-    const index = Number(event.active.id);
-    setActiveIndex(index);
-    setOverIndex(index);
-    accumulatedDeltaY.current = 0;
   }, []);
 
-  const onDragMove = useCallback(
-    (event: DragMoveEvent) => {
-      if (activeIndex === null) return;
-      accumulatedDeltaY.current = event.delta.y;
-      setOverIndex(clampIndex(activeIndex + Math.round(event.delta.y / rowHeight)));
-
-      const activatorEvent = event.activatorEvent as PointerEvent | undefined;
-      if (activatorEvent) {
-        lastClientY.current = activatorEvent.clientY + event.delta.y;
-      }
+  // Also stable, since runAutoScroll is stable.
+  const handlePointerMove = useCallback(
+    (event: PointerEvent) => {
+      rawClientY.current = event.clientY;
+      recomputeOverIndexRef.current();
       if (autoScrollFrame.current === null) {
         autoScrollFrame.current = requestAnimationFrame(runAutoScroll);
       }
     },
-    [activeIndex, rowHeight, clampIndex, runAutoScroll],
+    [runAutoScroll],
   );
+
+  const onDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const index = Number(event.active.id);
+      setActiveIndex(index);
+      setOverIndex(index);
+      const activatorEvent = event.activatorEvent as PointerEvent | undefined;
+      startClientY.current = activatorEvent?.clientY ?? 0;
+      rawClientY.current = startClientY.current;
+      startScrollTop.current = optionsRef.current.getScrollElement()?.scrollTop ?? 0;
+      // Capture phase: once the drag is active, dnd-kit stops propagation of pointer events
+      // at the bubble phase, so a bubble-phase listener here would stop firing almost
+      // immediately.
+      window.addEventListener("pointermove", handlePointerMove, true);
+    },
+    [handlePointerMove],
+  );
+
+  // Kept for API stability (and in case a future version needs it) — position tracking
+  // happens via the native pointermove listener above, not dnd-kit's own delta. See the
+  // hook's doc comment for why.
+  const onDragMove = useCallback((_event: DragMoveEvent) => {}, []);
 
   const reset = useCallback(() => {
     stopAutoScroll();
+    window.removeEventListener("pointermove", handlePointerMove, true);
     setActiveIndex(null);
     setOverIndex(null);
-    lastClientY.current = null;
-  }, [stopAutoScroll]);
+    rawClientY.current = null;
+  }, [stopAutoScroll, handlePointerMove]);
 
   const onDragEnd = useCallback(
     (_event: DragEndEvent) => {
       if (activeIndex !== null && overIndex !== null && activeIndex !== overIndex) {
-        onReorder(activeIndex, overIndex);
+        optionsRef.current.onReorder(activeIndex, overIndex);
       }
       reset();
     },
-    [activeIndex, overIndex, onReorder, reset],
+    [activeIndex, overIndex, reset],
   );
 
   const onDragCancel = useCallback(
@@ -176,6 +207,10 @@ export function useVirtualRowReorder(
     },
     [reset],
   );
+
+  // Safety net: drop the listener if the component unmounts mid-drag. handlePointerMove is
+  // stable, so this only ever runs on true unmount — not on every render.
+  useEffect(() => () => window.removeEventListener("pointermove", handlePointerMove, true), [handlePointerMove]);
 
   return {
     activeIndex,

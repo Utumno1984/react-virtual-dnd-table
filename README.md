@@ -52,6 +52,7 @@ function MyVirtualizedList({ items, setItems, scrollRef }) {
   return (
     <DndContext
       sensors={sensors}
+      autoScroll={false} // this hook drives its own, virtualization-aware auto-scroll
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}

@@ -18,6 +18,10 @@ body {
 h1 {
   font-size: 18px;
   margin: 0 0 4px 0;
+  /* Explicit color: index.css's h1 color is a theme variable that's only light
+     under prefers-color-scheme: dark, but this page is always dark regardless
+     of system theme — leaving it unset makes the title invisible in light mode. */
+  color: #e6e8eb;
 }
 
 .hint {

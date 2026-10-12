@@ -38,3 +38,4 @@ jobs:
             sleep 1
           done
           node packages/demo/e2e/drag-reorder.mjs
+          node packages/demo/e2e/auto-scroll-brake.mjs
