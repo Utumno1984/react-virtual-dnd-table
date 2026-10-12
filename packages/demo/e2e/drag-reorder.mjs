@@ -13,6 +13,12 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 960, height: 760 } });
 page.on("console", (msg) => console.log("[browser]", msg.type(), msg.text()));
 page.on("pageerror", (err) => console.error("[pageerror]", err));
+page.on("response", (res) => {
+  if (!res.ok()) console.log("[response]", res.status(), res.url());
+});
+page.on("requestfailed", (req) => {
+  console.log("[requestfailed]", req.url(), req.failure()?.errorText);
+});
 
 // Vite's dev server needs to transform/optimize deps on the very first request, which can
 // take a while on a cold CI runner — retry the navigation instead of failing on one slow load.
