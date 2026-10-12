@@ -11,8 +11,24 @@ const URL = process.env.DEMO_URL || "http://localhost:5180/";
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 960, height: 760 } });
-await page.goto(URL);
-await page.waitForSelector(".table-body");
+page.on("console", (msg) => console.log("[browser]", msg.type(), msg.text()));
+page.on("pageerror", (err) => console.error("[pageerror]", err));
+
+// Vite's dev server needs to transform/optimize deps on the very first request, which can
+// take a while on a cold CI runner — retry the navigation instead of failing on one slow load.
+let lastError;
+for (let attempt = 1; attempt <= 3; attempt++) {
+  try {
+    await page.goto(URL, { waitUntil: "load", timeout: 30000 });
+    await page.waitForSelector(".table-body", { timeout: 60000 });
+    lastError = null;
+    break;
+  } catch (err) {
+    lastError = err;
+    console.log(`tentativo ${attempt} fallito, riprovo...`);
+  }
+}
+if (lastError) throw lastError;
 
 const handle = page.locator(".drag-handle").first();
 const box = await handle.boundingBox();
