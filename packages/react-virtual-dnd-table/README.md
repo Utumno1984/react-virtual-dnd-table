@@ -12,7 +12,7 @@ pointer sits near the edge of the scroll container.
 Headless: it has no opinion on how your rows render, what UI kit you use, or which table
 library (if any) sits on top. You still use dnd-kit's own `useDraggable` on each row.
 
-Full story, screenshots and a 10,000-row demo: [GitHub repo](https://github.com/Utumno1984/react-virtual-dnd-table).
+**[Live demo →](https://react-virtual-dnd-table.vercel.app)** · Full story, screenshots and source: [GitHub repo](https://github.com/Utumno1984/react-virtual-dnd-table).
 
 ## Install
 

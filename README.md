@@ -6,6 +6,8 @@
 
 Drag-to-reorder for virtualized row lists — the piece [TanStack Table's own docs](https://tanstack.com/table/latest/docs/framework/react/guide/virtualization) leave for you to figure out.
 
+**[Live demo →](https://react-virtual-dnd-table.vercel.app)** (10,000 rows, try dragging past the viewport)
+
 ![drag-and-drop reorder on a 10,000-row virtualized table](./docs/screenshot.png)
 
 <video src="./docs/demo.webm" controls muted width="720">
