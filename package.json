@@ -1,0 +1,17 @@
+{
+  "name": "react-virtual-dnd-table-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w react-virtual-dnd-table",
+    "dev": "npm run dev -w demo",
+    "demo:build": "npm run build -w demo"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}
