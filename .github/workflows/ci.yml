@@ -32,7 +32,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Start demo dev server and run smoke test
         run: |
-          npx --prefix packages/demo vite --port 5180 &
+          (cd packages/demo && npx vite --port 5180) &
           for i in $(seq 1 30); do
             curl -sf http://localhost:5180/ > /dev/null && break
             sleep 1
