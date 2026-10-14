@@ -85,6 +85,10 @@ h1 {
   cursor: grabbing;
 }
 
+.row-placeholder {
+  opacity: 0.35;
+}
+
 .row-over {
   box-shadow: inset 0 2px 0 #4f8cff, inset 0 -2px 0 #4f8cff;
 }

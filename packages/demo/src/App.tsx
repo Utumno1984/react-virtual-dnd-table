@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { DndContext, useDraggable } from "@dnd-kit/core";
+import { DndContext, DragOverlay, useDraggable } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useVirtualRowReorder } from "react-virtual-dnd-table";
 import "./App.css";
@@ -129,6 +129,16 @@ function App() {
             })}
           </div>
         </div>
+        {/* The dragged row's own <DraggableRow> unmounts once auto-scroll carries its index
+            out of the virtualizer's window, so the visible "lifted" copy lives in a
+            DragOverlay instead — it is independent of what the virtualizer has mounted. */}
+        <DragOverlay>
+          {activeIndex !== null ? (
+            <div className="tr row row-active" style={{ height: ROW_HEIGHT }}>
+              <RowCells cells={rows[activeIndex].getVisibleCells()} />
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
     </div>
   );
@@ -143,7 +153,7 @@ function DraggableRow(props: {
 }) {
   // The drag handle's id is the row's CURRENT index, not a stable row id — that's what
   // lets useVirtualRowReorder derive the drop target from pointer math alone.
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: props.index });
+  const { attributes, listeners, setNodeRef } = useDraggable({ id: props.index });
 
   const style: CSSProperties = {
     position: "absolute",
@@ -151,20 +161,25 @@ function DraggableRow(props: {
     left: 0,
     width: "100%",
     height: ROW_HEIGHT,
-    transform: `translateY(${props.start}px) ${
-      props.isActive && transform ? `translate(${transform.x}px, ${transform.y}px)` : ""
-    }`,
-    zIndex: props.isActive ? 10 : 1,
+    transform: `translateY(${props.start}px)`,
   };
 
   return (
     <div
       ref={setNodeRef}
-      className={`tr row${props.isActive ? " row-active" : ""}${props.isOver ? " row-over" : ""}`}
+      className={`tr row${props.isActive ? " row-placeholder" : ""}${props.isOver ? " row-over" : ""}`}
       style={style}
     >
+      <RowCells cells={props.cells} handleProps={{ ...attributes, ...listeners }} />
+    </div>
+  );
+}
+
+function RowCells(props: { cells: Cell<Row, unknown>[]; handleProps?: object }) {
+  return (
+    <>
       <div className="td td-drag">
-        <button className="drag-handle" {...attributes} {...listeners}>
+        <button className="drag-handle" {...props.handleProps}>
           ⠿
         </button>
       </div>
@@ -173,7 +188,7 @@ function DraggableRow(props: {
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
