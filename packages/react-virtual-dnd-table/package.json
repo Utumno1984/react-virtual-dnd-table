@@ -1,6 +1,6 @@
 {
   "name": "react-virtual-dnd-table",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Drag-to-reorder for virtualized row lists (TanStack Virtual, react-window, ...) where dnd-kit alone can't see off-screen rows.",
   "type": "module",
   "main": "./dist/index.cjs",
