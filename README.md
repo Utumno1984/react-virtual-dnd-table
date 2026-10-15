@@ -67,6 +67,8 @@ function MyVirtualizedList({ items, setItems, scrollRef }) {
 
 Full working example (TanStack Table + TanStack Virtual, 10,000 rows): [`packages/demo`](./packages/demo).
 
+Using `<DragOverlay>` with your own virtualized rows? There are four easy-to-hit pitfalls (vanishing row during auto-scroll, offset overlay, drop animation flying back, two-sided drop indicator) — see [Pitfalls with `DragOverlay`](./packages/react-virtual-dnd-table/README.md#pitfalls-with-dragoverlay-and-virtualized-rows).
+
 Full API reference: [`packages/react-virtual-dnd-table/README.md`](./packages/react-virtual-dnd-table/README.md).
 
 ## Limitations (v0.1, by design — PRs welcome)

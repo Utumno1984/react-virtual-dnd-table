@@ -9,6 +9,10 @@ npm install   # from the repo root
 npm run dev   # from the repo root, or `npm run dev` here directly
 ```
 
+`src/App.tsx` is also the reference for the `DragOverlay` setup (rows positioned with `top`,
+`dropAnimation={null}`, one-sided drop indicator); the reasoning behind each choice is in the
+library's [Pitfalls](../react-virtual-dnd-table/README.md#pitfalls-with-dragoverlay-and-virtualized-rows) section.
+
 `e2e/drag-reorder.mjs` is a Playwright smoke test (not a formal test suite) that drags the
 first row past the visible viewport, forcing auto-scroll into rows that aren't mounted yet,
 and checks that the full 10,000-row array comes out with no duplicates or gaps. Run a dev

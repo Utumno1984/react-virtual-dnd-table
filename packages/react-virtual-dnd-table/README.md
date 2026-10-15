@@ -66,25 +66,91 @@ function MyVirtualizedList({ items, setItems, scrollRef, virtualItems }) {
 function Row({ index, top, isActive }) {
   // The drag handle's id is the row's CURRENT index, not a stable row id — that's what lets
   // useVirtualRowReorder derive the drop target from pointer math alone.
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: index });
+  const { attributes, listeners, setNodeRef } = useDraggable({ id: index });
 
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        position: "absolute",
-        top: 0,
-        transform: `translateY(${top}px) ${
-          isActive && transform ? `translate(${transform.x}px, ${transform.y}px)` : ""
-        }`,
-      }}
-    >
+    // Position with `top`, not `transform: translateY(...)` — see "Pitfalls" below.
+    <div ref={setNodeRef} style={{ position: "absolute", top, left: 0, width: "100%", height: ROW_HEIGHT }}>
       <button {...attributes} {...listeners}>⠿</button>
       {/* row content */}
     </div>
   );
 }
 ```
+
+The example above doesn't render the "lifted" copy of the dragged row. For that, add a
+`<DragOverlay>` — and read the next section first, it saves you a few debugging sessions.
+
+## Pitfalls with `DragOverlay` and virtualized rows
+
+These are not bugs in the hook: they follow from how dnd-kit interacts with virtualization (and
+from the hook using the row's current index as the draggable id). They're easy to hit when you
+wire up your own list, so here is the setup that avoids all of them.
+
+```tsx
+<DndContext sensors={sensors} autoScroll={false} onDragStart={onDragStart} /* ... */>
+  {/* virtual rows, positioned with `top` (see 2) */}
+  <DragOverlay dropAnimation={null}>
+    {activeIndex !== null ? <RowView item={items[activeIndex]} /> : null}
+  </DragOverlay>
+</DndContext>
+```
+
+### 1. The dragged row disappears during auto-scroll
+
+If you show the dragged row in place (moving it with the `transform` that `useDraggable`
+returns), it leaves the window of rows the virtualizer keeps mounted as soon as auto-scroll
+carries the drag far enough. The node is unmounted and the row vanishes from the DOM mid-drag.
+
+Render the lifted copy in a `<DragOverlay>` instead: it lives outside the virtualized list, so
+it's independent of what the virtualizer has mounted. Use `activeIndex` to look the record up in
+your own array (`items[activeIndex]`); nothing else is needed from the hook. In the list, you can
+render the original row as a placeholder (e.g. dimmed) while `index === activeIndex`.
+
+### 2. The overlay copy starts offset by the row's index
+
+If rows are positioned with `transform: translateY(...)`, the overlay starts in the wrong place
+— always from the top of the list, shifted by `index * rowHeight`. dnd-kit measures the
+draggable's rect with CSS transforms stripped, to know where to anchor the overlay, so the
+offset hidden in the transform is lost.
+
+Position virtualized rows with `top` (inline style) instead:
+
+```tsx
+style={{ position: "absolute", top: virtualRow.start, left: 0, width: "100%", height: ROW_HEIGHT }}
+```
+
+### 3. The drop animation flies back to the origin
+
+By default `<DragOverlay>` animates on drop towards the node whose draggable id equals the active
+id. Because the hook uses the row's *current index* as the id (that's what lets it derive the drop
+target from pointer math alone), after the reorder that id belongs to a different record, near
+where the drag started — so the overlay animates back to the origin, not to the destination.
+
+The simplest robust fix is to turn the animation off. The real row is already in its final
+position after the re-render, so there is nothing left to animate:
+
+```tsx
+<DragOverlay dropAnimation={null}>{/* ... */}</DragOverlay>
+```
+
+### 4. The drop indicator should show only one side
+
+The hook exposes `overIndex`, the destination slot, with no notion of "above" or "below" a row.
+If you highlight both edges of the row at `overIndex`, the indicator is ambiguous. Derive the side
+by comparing it with `activeIndex`:
+
+```tsx
+const side =
+  overIndex === null || activeIndex === null || index !== overIndex || index === activeIndex
+    ? null
+    : overIndex > activeIndex
+      ? "below" // dragged down: the record lands after this row → bottom border only
+      : "above"; // dragged up: it lands before this row → top border only
+```
+
+The complete, working version of all four is in
+[`packages/demo/src/App.tsx`](https://github.com/Utumno1984/react-virtual-dnd-table/blob/main/packages/demo/src/App.tsx).
 
 ## API
 
