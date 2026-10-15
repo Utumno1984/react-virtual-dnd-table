@@ -70,7 +70,19 @@ function Row({ index, top, isActive }) {
 
   return (
     // Position with `top`, not `transform: translateY(...)` — see "Pitfalls" below.
-    <div ref={setNodeRef} style={{ position: "absolute", top, left: 0, width: "100%", height: ROW_HEIGHT }}>
+    // Dimmed while active: the "lifted" copy that follows the cursor lives in a
+    // <DragOverlay> instead (see "Pitfalls" below), so this one just marks its spot.
+    <div
+      ref={setNodeRef}
+      style={{
+        position: "absolute",
+        top,
+        left: 0,
+        width: "100%",
+        height: ROW_HEIGHT,
+        opacity: isActive ? 0.35 : 1,
+      }}
+    >
       <button {...attributes} {...listeners}>⠿</button>
       {/* row content */}
     </div>
