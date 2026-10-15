@@ -41,3 +41,5 @@ jobs:
           node packages/demo/e2e/auto-scroll-brake.mjs
           node packages/demo/e2e/dragged-row-visible.mjs
           node packages/demo/e2e/drag-overlay-offset.mjs
+          node packages/demo/e2e/drop-animation-destination.mjs
+          node packages/demo/e2e/drop-indicator-side.mjs

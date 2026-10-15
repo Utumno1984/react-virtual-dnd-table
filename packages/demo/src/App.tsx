@@ -117,11 +117,16 @@ function App() {
                   index={virtualRow.index}
                   start={virtualRow.start}
                   isActive={virtualRow.index === activeIndex}
-                  isOver={
+                  overSide={
                     overIndex !== null &&
                     activeIndex !== null &&
                     virtualRow.index === overIndex &&
                     virtualRow.index !== activeIndex
+                      ? // Dragged down: the record lands after this row; dragged up: before it.
+                        overIndex > activeIndex
+                        ? "below"
+                        : "above"
+                      : null
                   }
                   cells={row.getVisibleCells()}
                 />
@@ -132,7 +137,11 @@ function App() {
         {/* The dragged row's own <DraggableRow> unmounts once auto-scroll carries its index
             out of the virtualizer's window, so the visible "lifted" copy lives in a
             DragOverlay instead — it is independent of what the virtualizer has mounted. */}
-        <DragOverlay>
+        {/* dropAnimation={null}: by default dnd-kit animates the overlay towards the node whose
+            draggable id equals the active id. Ids are row POSITIONS, and after onReorder the node
+            holding the old id is a different record sitting near the drag's origin — so the copy
+            would fly back to where it started. The real row is already in its final place. */}
+        <DragOverlay dropAnimation={null}>
           {activeIndex !== null ? (
             <div className="tr row row-active" style={{ height: ROW_HEIGHT }}>
               <RowCells cells={rows[activeIndex].getVisibleCells()} />
@@ -148,7 +157,7 @@ function DraggableRow(props: {
   index: number;
   start: number;
   isActive: boolean;
-  isOver: boolean;
+  overSide: "above" | "below" | null;
   cells: Cell<Row, unknown>[];
 }) {
   // The drag handle's id is the row's CURRENT index, not a stable row id — that's what
@@ -169,7 +178,7 @@ function DraggableRow(props: {
   return (
     <div
       ref={setNodeRef}
-      className={`tr row${props.isActive ? " row-placeholder" : ""}${props.isOver ? " row-over" : ""}`}
+      className={`tr row${props.isActive ? " row-placeholder" : ""}${props.overSide ? ` row-over-${props.overSide}` : ""}`}
       style={style}
     >
       <RowCells cells={props.cells} handleProps={{ ...attributes, ...listeners }} />
