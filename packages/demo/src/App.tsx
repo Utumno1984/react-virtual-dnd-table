@@ -157,11 +157,13 @@ function DraggableRow(props: {
 
   const style: CSSProperties = {
     position: "absolute",
-    top: 0,
+    // `top`, not `transform: translateY(...)`: DragOverlay starts from the draggable's rect as
+    // measured by dnd-kit, which strips CSS transforms — a transform-positioned row would make
+    // the overlay start at the list's top instead of at the row (offset of index * ROW_HEIGHT).
+    top: props.start,
     left: 0,
     width: "100%",
     height: ROW_HEIGHT,
-    transform: `translateY(${props.start}px)`,
   };
 
   return (

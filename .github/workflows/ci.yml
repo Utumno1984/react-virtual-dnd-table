@@ -40,3 +40,4 @@ jobs:
           node packages/demo/e2e/drag-reorder.mjs
           node packages/demo/e2e/auto-scroll-brake.mjs
           node packages/demo/e2e/dragged-row-visible.mjs
+          node packages/demo/e2e/drag-overlay-offset.mjs
